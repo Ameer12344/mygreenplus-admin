@@ -16,6 +16,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import LogoutButton from './LogoutButton';
+import RealtimeNotifier from './RealtimeNotifier';
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
@@ -77,6 +78,7 @@ export default function Sidebar({ adminName }: { adminName: string }) {
           </span>
         </div>
         <div className="flex items-center gap-1">
+          <RealtimeNotifier />
           <button
             onClick={() => setMobileOpen(true)}
             aria-label="Open menu"
@@ -126,13 +128,16 @@ export default function Sidebar({ adminName }: { adminName: string }) {
 
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex flex-col w-64 fixed inset-y-0 left-0 bg-forest-950 text-white">
-        <div className="flex items-center gap-2.5 px-6 py-6">
-          <div className="w-8 h-8 rounded-lg bg-acid flex items-center justify-center flex-shrink-0">
-            <Leaf className="w-4 h-4 text-forest-950" strokeWidth={2.5} />
+        <div className="flex items-center justify-between px-6 py-6">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-acid flex items-center justify-center flex-shrink-0">
+              <Leaf className="w-4 h-4 text-forest-950" strokeWidth={2.5} />
+            </div>
+            <span className="font-display font-semibold text-base tracking-tight">
+              MyGreenPlus
+            </span>
           </div>
-          <span className="font-display font-semibold text-base tracking-tight">
-            MyGreenPlus
-          </span>
+          <RealtimeNotifier />
         </div>
 
         <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto scrollbar-thin">
