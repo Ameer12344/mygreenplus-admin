@@ -146,7 +146,7 @@ export default function RealtimeNotifier() {
 
   return (
     <>
-      {/* Bell + panel anchored together */}
+      {/* Bell button — inline, sits wherever the Sidebar renders it */}
       <div className="relative">
         <button
           onClick={openPanel}
@@ -160,12 +160,13 @@ export default function RealtimeNotifier() {
             </span>
           )}
         </button>
+      </div>
 
-      {/* Notification panel — anchored below the bell */}
+      {/* Notification panel — drops down from the bell button */}
       {panelOpen && (
         <div className="fixed inset-0 z-[60]" onClick={() => setPanelOpen(false)}>
           <div
-            className="absolute top-16 left-4 lg:left-56 w-80 bg-white rounded-xl shadow-2xl border border-sage-100 overflow-hidden"
+            className="absolute top-14 right-4 w-80 bg-white rounded-xl shadow-2xl border border-sage-100 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-sage-100">
@@ -210,7 +211,6 @@ export default function RealtimeNotifier() {
           </div>
         </div>
       )}
-      </div>
 
       {/* Toast popups — bottom-right, auto-dismiss */}
       <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-2 pointer-events-none">
