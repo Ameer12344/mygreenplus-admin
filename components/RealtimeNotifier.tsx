@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { createClient } from '@/lib/supabase/client';
 import { Bell, X, FileWarning, Recycle, UserPlus } from 'lucide-react';
 
@@ -19,8 +20,47 @@ export default function RealtimeNotifier() {
   const [toasts, setToasts] = useState<Notif[]>([]);
   const [panelOpen, setPanelOpen] = useState(false);
   const [unread, setUnread] = useState(0);
+  const [panelPos, setPanelPos] = useState<{ top: number; left: number } | null>(null);
+  const [mounted, setMounted] = useState(false);
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
   const channelRef = useRef<any>(null);
+  const bellRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Portals need the DOM, which isn't available during SSR
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Recompute the panel's fixed viewport position so it's never clipped
+  // by a parent sidebar's overflow, and stays anchored on resize/scroll.
+  useLayoutEffect(() => {
+    if (!panelOpen) return;
+
+    const PANEL_WIDTH = 320; // matches w-80
+    const MARGIN = 8;
+
+    function updatePosition() {
+      const btn = bellRef.current;
+      if (!btn) return;
+      const rect = btn.getBoundingClientRect();
+
+      let left = rect.right - PANEL_WIDTH;
+      left = Math.min(Math.max(left, MARGIN), window.innerWidth - PANEL_WIDTH - MARGIN);
+
+      const top = rect.bottom + 8;
+
+      setPanelPos({ top, left });
+    }
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [panelOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -149,6 +189,7 @@ export default function RealtimeNotifier() {
       {/* Bell button — inline, sits wherever the Sidebar renders it */}
       <div className="relative">
         <button
+          ref={bellRef}
           onClick={openPanel}
           className="relative p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
           aria-label="Notifications"
@@ -162,55 +203,71 @@ export default function RealtimeNotifier() {
         </button>
       </div>
 
-      {/* Notification panel — drops down from the bell button */}
-      {panelOpen && (
-        <div className="fixed inset-0 z-[60]" onClick={() => setPanelOpen(false)}>
-          <div
-            className="absolute top-14 right-4 w-80 bg-white rounded-xl shadow-2xl border border-sage-100 overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-sage-100">
-              <span className="font-semibold text-sm text-ink">Notifications</span>
-              <div className="flex items-center gap-2">
-                {notifs.length > 0 && (
-                  <button onClick={clearAll} className="text-xs text-sage-400 hover:text-ink transition-colors">
-                    Clear all
+      {/*
+        Notification panel — rendered through a portal straight into document.body.
+        This is deliberate: the bell often lives inside a sidebar that has its own
+        overflow/scroll container, which would silently clip an absolutely-positioned
+        panel even if the CSS math were correct. Portaling out, and positioning with
+        `fixed` + coordinates measured from the bell's real screen position, guarantees
+        the panel always renders directly below the bell with nothing able to clip it.
+      */}
+      {mounted &&
+        panelOpen &&
+        panelPos &&
+        createPortal(
+          <>
+            {/* invisible backdrop just to catch outside clicks and close the panel */}
+            <div className="fixed inset-0 z-[60]" onClick={() => setPanelOpen(false)} />
+
+            <div
+              ref={panelRef}
+              style={{ top: panelPos.top, left: panelPos.left }}
+              className="fixed w-80 bg-white rounded-xl shadow-2xl border border-sage-100 overflow-hidden z-[61]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b border-sage-100">
+                <span className="font-semibold text-sm text-ink">Notifications</span>
+                <div className="flex items-center gap-2">
+                  {notifs.length > 0 && (
+                    <button onClick={clearAll} className="text-xs text-sage-400 hover:text-ink transition-colors">
+                      Clear all
+                    </button>
+                  )}
+                  <button onClick={() => setPanelOpen(false)} className="text-sage-400 hover:text-ink">
+                    <X className="w-4 h-4" />
                   </button>
+                </div>
+              </div>
+
+              <div className="max-h-96 overflow-y-auto divide-y divide-sage-50">
+                {notifs.length === 0 ? (
+                  <div className="px-4 py-8 text-center">
+                    <Bell className="w-8 h-8 text-sage-200 mx-auto mb-2" />
+                    <p className="text-sm text-sage-400">No notifications yet</p>
+                    <p className="text-xs text-sage-300 mt-1">New reports and drop-offs will appear here in real time</p>
+                  </div>
+                ) : (
+                  notifs.map((n) => (
+                    <div key={n.id} className="flex items-start gap-3 px-4 py-3 hover:bg-sage-50 transition-colors">
+                      <div className="w-7 h-7 rounded-lg bg-sage-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <NotifIcon type={n.type} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-ink">{n.title}</p>
+                        <p className="text-xs text-sage-400 mt-0.5 truncate">{n.body}</p>
+                        <p className="text-[10px] text-sage-300 mt-1">{timeAgo(n.at)}</p>
+                      </div>
+                      <button onClick={() => dismissNotif(n.id)} className="text-sage-300 hover:text-sage-400 flex-shrink-0">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))
                 )}
-                <button onClick={() => setPanelOpen(false)} className="text-sage-400 hover:text-ink">
-                  <X className="w-4 h-4" />
-                </button>
               </div>
             </div>
-
-            <div className="max-h-96 overflow-y-auto divide-y divide-sage-50">
-              {notifs.length === 0 ? (
-                <div className="px-4 py-8 text-center">
-                  <Bell className="w-8 h-8 text-sage-200 mx-auto mb-2" />
-                  <p className="text-sm text-sage-400">No notifications yet</p>
-                  <p className="text-xs text-sage-300 mt-1">New reports and drop-offs will appear here in real time</p>
-                </div>
-              ) : (
-                notifs.map((n) => (
-                  <div key={n.id} className="flex items-start gap-3 px-4 py-3 hover:bg-sage-50 transition-colors">
-                    <div className="w-7 h-7 rounded-lg bg-sage-50 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <NotifIcon type={n.type} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-ink">{n.title}</p>
-                      <p className="text-xs text-sage-400 mt-0.5 truncate">{n.body}</p>
-                      <p className="text-[10px] text-sage-300 mt-1">{timeAgo(n.at)}</p>
-                    </div>
-                    <button onClick={() => dismissNotif(n.id)} className="text-sage-300 hover:text-sage-400 flex-shrink-0">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+          </>,
+          document.body
+        )}
 
       {/* Toast popups — bottom-right, auto-dismiss */}
       <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-2 pointer-events-none">

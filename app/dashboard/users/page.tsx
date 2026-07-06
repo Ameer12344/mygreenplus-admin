@@ -4,6 +4,7 @@ import { ShieldCheck, Shield, ChevronLeft, ChevronRight, Banknote } from 'lucide
 import Link from 'next/link';
 import { adjustPoints, toggleAdmin } from './actions';
 import UserFilters from './UserFilters';
+import UsersRealtimeRefresher from './UsersRealtimeRefresher';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,6 +60,9 @@ export default async function UsersPage({
 
   return (
     <div className="space-y-6">
+      {/* Auto-refreshes this server component's data when app_users changes via Realtime */}
+      <UsersRealtimeRefresher />
+
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
           <h1 className="font-display font-semibold text-2xl text-ink">Users</h1>
