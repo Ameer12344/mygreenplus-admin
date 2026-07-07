@@ -8,13 +8,42 @@ import RealtimeRefresher from '@/components/RealtimeRefresher';
 export const dynamic = 'force-dynamic';
 
 const TREND_DAYS = 14;
+const ADMIN_TIMEZONE = 'Asia/Kuala_Lumpur';
+
+// Formats any Date into a "YYYY-MM-DD" key for a given local timezone,
+// independent of what timezone the server itself is running in.
+const dayKeyFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: ADMIN_TIMEZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+function localDayKey(d: Date): string {
+  return dayKeyFormatter.format(d); // e.g. "2026-07-07"
+}
 
 export default async function OverviewPage() {
   const supabase = createClient();
 
-  const trendSince = new Date();
-  trendSince.setDate(trendSince.getDate() - (TREND_DAYS - 1));
-  trendSince.setHours(0, 0, 0, 0);
+  // Anchor "today" to the admin's local calendar day (Asia/Kuala_Lumpur),
+  // not the server's own clock/timezone (which is typically UTC on most hosts).
+  const todayKey = localDayKey(new Date());
+  const [ty, tm, td] = todayKey.split('-').map(Number);
+  const todayAnchor = new Date(Date.UTC(ty, tm - 1, td));
+
+  // Build the last TREND_DAYS local calendar day-keys, oldest → newest, today included.
+  const dayKeys: string[] = [];
+  for (let i = TREND_DAYS - 1; i >= 0; i--) {
+    const d = new Date(todayAnchor);
+    d.setUTCDate(d.getUTCDate() - i);
+    dayKeys.push(d.toISOString().slice(0, 10));
+  }
+
+  // Fetch a couple of extra buffer days before the window so rows near the
+  // UTC/local-timezone boundary aren't missed, then bucket by local calendar day below.
+  const fetchSince = new Date(todayAnchor);
+  fetchSince.setUTCDate(fetchSince.getUTCDate() - (TREND_DAYS + 1));
 
   const [
     { count: userCount },
@@ -39,7 +68,7 @@ export default async function OverviewPage() {
     supabase
       .from('drop_off_history')
       .select('weight_kg, created_at')
-      .gte('created_at', trendSince.toISOString()),
+      .gte('created_at', fetchSince.toISOString()),
     supabase.from('withdrawals').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
   ]);
 
@@ -53,22 +82,26 @@ export default async function OverviewPage() {
     }
   });
 
-  // Build contiguous 14-day buckets so days with no drop-offs still show as 0.
+  // Build contiguous local-day buckets so days with no drop-offs still show as 0,
+  // and today's bucket is always present (even before any drop-offs happen today).
   const buckets = new Map<string, number>();
-  for (let i = 0; i < TREND_DAYS; i++) {
-    const d = new Date(trendSince);
-    d.setDate(d.getDate() + i);
-    buckets.set(d.toISOString().slice(0, 10), 0);
-  }
+  dayKeys.forEach((key) => buckets.set(key, 0));
+
   (trendRows ?? []).forEach((row) => {
-    const key = row.created_at.slice(0, 10);
+    const key = localDayKey(new Date(row.created_at));
     if (buckets.has(key)) {
       buckets.set(key, (buckets.get(key) ?? 0) + Number(row.weight_kg));
     }
   });
-  const trendData = Array.from(buckets.entries()).map(([key, kg]) => ({
-    day: new Date(key).toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
-    kg,
+
+  const trendData = dayKeys.map((key) => ({
+    day: new Date(`${key}T00:00:00Z`).toLocaleDateString('en-US', {
+      day: 'numeric',
+      month: 'short',
+      timeZone: 'UTC',
+    }),
+    kg: buckets.get(key) ?? 0,
+    isToday: key === todayKey,
   }));
 
   return (
