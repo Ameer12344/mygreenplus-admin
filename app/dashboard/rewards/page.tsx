@@ -5,6 +5,7 @@ import StatusBadge from '@/components/StatusBadge';
 import AddRewardModal from './AddRewardModal';
 import { toggleRewardStatus } from './actions';
 import DeleteRewardButton from './DeleteRewardButton';
+import RealtimeRefresher from '@/components/RealtimeRefresher';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,6 +32,10 @@ export default async function RewardsPage({
 
   return (
     <div className="space-y-6">
+      {/* Auto-refresh when a user claims a reward, or when reward stock/status changes */}
+      <RealtimeRefresher table="reward_claims" />
+      <RealtimeRefresher table="rewards" />
+
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
           <h1 className="font-display font-semibold text-2xl text-ink">Rewards &amp; Claims</h1>
