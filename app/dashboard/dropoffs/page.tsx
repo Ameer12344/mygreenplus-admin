@@ -5,6 +5,7 @@ import StatusBadge from '@/components/StatusBadge';
 import SearchBox from '@/components/SearchBox';
 import UpdateRvmStatus from './UpdateRvmStatus';
 import LogDropoffModal from './LogDropoffModal';
+import ExportCsvButton from './ExportCsvButton';
 import { MapPin, Package } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -210,7 +211,10 @@ export default async function DropoffsPage({
       <div>
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-3">
           <h2 className="font-display font-semibold text-base text-ink">Drop-off history</h2>
-          <SearchBox placeholder="Search user or machine…" />
+          <div className="flex items-center gap-2">
+            <SearchBox placeholder="Search user or machine…" />
+            <ExportCsvButton />
+          </div>
         </div>
 
         <div className="bg-white rounded-xl2 shadow-card overflow-hidden">

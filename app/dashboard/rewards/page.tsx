@@ -6,6 +6,7 @@ import AddRewardModal from './AddRewardModal';
 import { toggleRewardStatus } from './actions';
 import DeleteRewardButton from './DeleteRewardButton';
 import RealtimeRefresher from '@/components/RealtimeRefresher';
+import ExportButton from '@/components/ExportButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,8 +46,12 @@ export default async function RewardsPage({
         </div>
 
         {tab === 'rewards' && (
-          <AddRewardModal />
+          <div className="flex items-center gap-2">
+            <ExportButton type="rewards" />
+            <AddRewardModal />
+          </div>
         )}
+        {tab === 'claims' && <ExportButton type="claims" label="Download claims CSV" />}
       </div>
 
       <div className="flex gap-1 bg-white rounded-lg shadow-card p-1 w-fit">

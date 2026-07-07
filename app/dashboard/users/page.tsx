@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { adjustPoints, toggleAdmin } from './actions';
 import UserFilters from './UserFilters';
 import UsersRealtimeRefresher from './UsersRealtimeRefresher';
+import ExportButton from '@/components/ExportButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,6 +72,7 @@ export default async function UsersPage({
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <ExportButton type="users" label="Download users CSV" />
           <Link
             href="/dashboard/withdrawals"
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-forest-900/8 text-forest-900 hover:bg-forest-900/15 transition-colors whitespace-nowrap"

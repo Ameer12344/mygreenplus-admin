@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { MessageSquareWarning } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import ReportModal from './ReportModal';
+import ExportCsvButton from '@/components/ExportCsvButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,9 +34,12 @@ export default async function ReportsPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-display font-semibold text-2xl text-ink">Problem Reports</h1>
-        <p className="text-sage-400 text-sm mt-1">{reports?.length ?? 0} reports</p>
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div>
+          <h1 className="font-display font-semibold text-2xl text-ink">Problem Reports</h1>
+          <p className="text-sage-400 text-sm mt-1">{reports?.length ?? 0} reports</p>
+        </div>
+        <ExportCsvButton type="reports" />
       </div>
 
       <div className="flex gap-1 bg-white rounded-lg shadow-card p-1 w-fit overflow-x-auto scrollbar-thin">

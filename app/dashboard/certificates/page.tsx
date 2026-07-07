@@ -7,6 +7,7 @@ import { deleteCertificate } from './actions';
 import { deleteTask, toggleTaskStatus } from './taskActions';
 import IssueForUserModal from './IssueForUserModal';
 import RealtimeRefresher from '@/components/RealtimeRefresher';
+import ExportCsvButton from '@/components/ExportCsvButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -109,6 +110,7 @@ export default async function CertificatesPage({
           </p>
         </div>
         <div className="flex gap-2">
+          <ExportCsvButton type={tab === 'certificates' ? 'certificates' : 'tasks'} />
           {tab === 'certificates' && <IssueCertificateModal users={users ?? []} />}
           {tab === 'tasks' && <AddTaskModal />}
         </div>
