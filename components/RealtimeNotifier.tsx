@@ -3,9 +3,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { createClient } from '@/lib/supabase/client';
-import { Bell, X, FileWarning, Recycle, UserPlus } from 'lucide-react';
+import { Bell, X, FileWarning, Recycle, UserPlus, Gift, Banknote } from 'lucide-react';
 
-type NotifType = 'report' | 'dropoff' | 'newuser';
+type NotifType = 'report' | 'dropoff' | 'newuser' | 'claim' | 'withdrawal';
 
 interface Notif {
   id: string;
@@ -121,6 +121,34 @@ export default function RealtimeNotifier() {
         }
       );
 
+      channel.on(
+        'postgres_changes' as any,
+        { event: 'INSERT', schema: 'public', table: 'reward_claims' },
+        (payload: any) => {
+          if (cancelled) return;
+          const row = payload.new;
+          push({
+            type: 'claim',
+            title: 'Reward claimed',
+            body: `${row.points_spent ?? '?'} pts spent · voucher ${row.voucher_code ?? ''}`,
+          });
+        }
+      );
+
+      channel.on(
+        'postgres_changes' as any,
+        { event: 'INSERT', schema: 'public', table: 'withdrawals' },
+        (payload: any) => {
+          if (cancelled) return;
+          const row = payload.new;
+          push({
+            type: 'withdrawal',
+            title: 'New withdrawal request',
+            body: `RM ${Number(row.amount_rm ?? 0).toFixed(2)} · ${row.bank ?? 'Bank'} — awaiting approval`,
+          });
+        }
+      );
+
       channel.subscribe((status: string) => {
         console.log('[RealtimeNotifier] status:', status);
       });
@@ -174,6 +202,8 @@ export default function RealtimeNotifier() {
   const NotifIcon = ({ type }: { type: NotifType }) => {
     if (type === 'report') return <FileWarning className="w-4 h-4 text-rose-500" />;
     if (type === 'newuser') return <UserPlus className="w-4 h-4 text-blue-500" />;
+    if (type === 'claim') return <Gift className="w-4 h-4 text-plum-500" />;
+    if (type === 'withdrawal') return <Banknote className="w-4 h-4 text-amber-600" />;
     return <Recycle className="w-4 h-4 text-forest-700" />;
   };
 
