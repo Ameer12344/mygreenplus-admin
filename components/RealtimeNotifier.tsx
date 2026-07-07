@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Bell, X, FileWarning, Recycle, UserPlus, Gift, Banknote } from 'lucide-react';
 
@@ -15,7 +16,18 @@ interface Notif {
   at: Date;
 }
 
+// Where clicking each notification type should navigate.
+// Adjust these paths if your actual route slugs differ.
+const NOTIF_ROUTES: Record<NotifType, string> = {
+  report: '/dashboard/reports',
+  dropoff: '/dashboard/dropoffs',
+  newuser: '/dashboard/users',
+  claim: '/dashboard/rewards',
+  withdrawal: '/dashboard/withdrawals',
+};
+
 export default function RealtimeNotifier() {
+  const router = useRouter();
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [toasts, setToasts] = useState<Notif[]>([]);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -199,6 +211,13 @@ export default function RealtimeNotifier() {
     setPanelOpen(false);
   }
 
+  function handleNotifClick(n: Notif) {
+    router.push(NOTIF_ROUTES[n.type]);
+    setPanelOpen(false);
+    dismissNotif(n.id);
+    dismissToast(n.id);
+  }
+
   const NotifIcon = ({ type }: { type: NotifType }) => {
     if (type === 'report') return <FileWarning className="w-4 h-4 text-rose-500" />;
     if (type === 'newuser') return <UserPlus className="w-4 h-4 text-blue-500" />;
@@ -278,7 +297,11 @@ export default function RealtimeNotifier() {
                   </div>
                 ) : (
                   notifs.map((n) => (
-                    <div key={n.id} className="flex items-start gap-3 px-4 py-3 hover:bg-sage-50 transition-colors">
+                    <div
+                      key={n.id}
+                      onClick={() => handleNotifClick(n)}
+                      className="flex items-start gap-3 px-4 py-3 hover:bg-sage-50 transition-colors cursor-pointer"
+                    >
                       <div className="w-7 h-7 rounded-lg bg-sage-50 flex items-center justify-center flex-shrink-0 mt-0.5">
                         <NotifIcon type={n.type} />
                       </div>
@@ -287,7 +310,13 @@ export default function RealtimeNotifier() {
                         <p className="text-xs text-sage-400 mt-0.5 truncate">{n.body}</p>
                         <p className="text-[10px] text-sage-300 mt-1">{timeAgo(n.at)}</p>
                       </div>
-                      <button onClick={() => dismissNotif(n.id)} className="text-sage-300 hover:text-sage-400 flex-shrink-0">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          dismissNotif(n.id);
+                        }}
+                        className="text-sage-300 hover:text-sage-400 flex-shrink-0"
+                      >
                         <X className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -304,7 +333,8 @@ export default function RealtimeNotifier() {
         {toasts.map((n) => (
           <div
             key={n.id}
-            className="pointer-events-auto flex items-start gap-3 bg-white rounded-xl shadow-xl border border-sage-100 px-4 py-3 w-72"
+            onClick={() => handleNotifClick(n)}
+            className="pointer-events-auto flex items-start gap-3 bg-white rounded-xl shadow-xl border border-sage-100 px-4 py-3 w-72 cursor-pointer"
             style={{ transition: 'all 0.3s ease-out' }}
           >
             <div className="w-7 h-7 rounded-lg bg-sage-50 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -314,7 +344,13 @@ export default function RealtimeNotifier() {
               <p className="text-xs font-semibold text-ink">{n.title}</p>
               <p className="text-xs text-sage-400 mt-0.5">{n.body}</p>
             </div>
-            <button onClick={() => dismissToast(n.id)} className="text-sage-300 hover:text-sage-400 flex-shrink-0 mt-0.5">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                dismissToast(n.id);
+              }}
+              className="text-sage-300 hover:text-sage-400 flex-shrink-0 mt-0.5"
+            >
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
