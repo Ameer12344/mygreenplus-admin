@@ -28,6 +28,15 @@ export default function WithdrawalList({ initial }: { initial: Withdrawal[] }) {
   const [items, setItems] = useState<Withdrawal[]>(initial);
   const channelRef = useRef<any>(null);
 
+  // useState(initial) only seeds state on first mount. On soft navigation
+  // (e.g. clicking a sidebar Link back to this page), the server component
+  // re-renders with a fresh `initial` prop, but without this effect, `items`
+  // would keep showing whatever was there the very first time this
+  // component mounted. This keeps local state in sync with the server data.
+  useEffect(() => {
+    setItems(initial);
+  }, [initial]);
+
   useEffect(() => {
     const supabase = createClient();
 
