@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -26,7 +26,30 @@ const NOTIF_ROUTES: Record<NotifType, string> = {
   withdrawal: '/dashboard/withdrawals',
 };
 
-export default function RealtimeNotifier() {
+interface NotificationsContextValue {
+  unread: number;
+  openPanel: (anchor: HTMLElement | null) => void;
+}
+
+const NotificationsContext = createContext<NotificationsContextValue | null>(null);
+
+/** Used by <NotificationBell/> to read the shared unread count and open the panel. */
+export function useNotifications() {
+  const ctx = useContext(NotificationsContext);
+  if (!ctx) {
+    throw new Error('useNotifications must be used within <NotificationsProvider>');
+  }
+  return ctx;
+}
+
+/**
+ * Owns all notification state, the *single* realtime subscription, and
+ * renders the panel + toasts via a portal. Mount this exactly once — e.g.
+ * in the dashboard layout, wrapping everything else — so any number of
+ * <NotificationBell/> triggers (mobile top bar, desktop sidebar, ...) share
+ * one source of truth instead of drifting out of sync with each other.
+ */
+export default function NotificationsProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [toasts, setToasts] = useState<Notif[]>([]);
@@ -35,13 +58,13 @@ export default function RealtimeNotifier() {
   const [mounted, setMounted] = useState(false);
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
   const channelRef = useRef<any>(null);
-  const bellRef = useRef<HTMLButtonElement>(null);
+  const anchorRef = useRef<HTMLElement | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Unread count is derived from the list, not tracked as separate state —
-  // a notification only stops counting once it's actually gone from `notifs`
-  // (clicked, individually dismissed with its ✕, or "Clear all"). Just
-  // opening or closing the panel to look should never clear it.
+  // Unread count is derived from the list, not tracked separately — a
+  // notification only stops counting once it's actually gone from `notifs`
+  // (clicked, individually dismissed, or "Clear all"). Just opening the
+  // panel to look, or closing it again, shouldn't clear it.
   const unread = notifs.length;
 
   // Portals need the DOM, which isn't available during SSR
@@ -58,7 +81,7 @@ export default function RealtimeNotifier() {
     const MARGIN = 8;
 
     function updatePosition() {
-      const btn = bellRef.current;
+      const btn = anchorRef.current;
       if (!btn) return;
       const rect = btn.getBoundingClientRect();
 
@@ -167,7 +190,7 @@ export default function RealtimeNotifier() {
       );
 
       channel.subscribe((status: string) => {
-        console.log('[RealtimeNotifier] status:', status);
+        console.log('[NotificationsProvider] status:', status);
       });
 
       channelRef.current = channel;
@@ -195,7 +218,8 @@ export default function RealtimeNotifier() {
     }, 6000);
   }
 
-  function openPanel() {
+  function openPanel(anchor: HTMLElement | null) {
+    anchorRef.current = anchor;
     setPanelOpen(true);
   }
 
@@ -236,23 +260,8 @@ export default function RealtimeNotifier() {
   };
 
   return (
-    <>
-      {/* Bell button — inline, sits wherever the Sidebar renders it */}
-      <div className="relative">
-        <button
-          ref={bellRef}
-          onClick={openPanel}
-          className="relative p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
-          aria-label="Notifications"
-        >
-          <Bell className="w-5 h-5" />
-          {unread > 0 && (
-            <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
-              {unread > 9 ? '9+' : unread}
-            </span>
-          )}
-        </button>
-      </div>
+    <NotificationsContext.Provider value={{ unread, openPanel }}>
+      {children}
 
       {/*
         Notification panel — rendered through a portal straight into document.body.
@@ -260,7 +269,7 @@ export default function RealtimeNotifier() {
         overflow/scroll container, which would silently clip an absolutely-positioned
         panel even if the CSS math were correct. Portaling out, and positioning with
         `fixed` + coordinates measured from the bell's real screen position, guarantees
-        the panel always renders directly below the bell with nothing able to clip it.
+        the panel always renders directly below whichever bell was clicked.
       */}
       {mounted &&
         panelOpen &&
@@ -358,6 +367,6 @@ export default function RealtimeNotifier() {
           </div>
         ))}
       </div>
-    </>
+    </NotificationsContext.Provider>
   );
 }
