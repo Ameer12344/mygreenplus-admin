@@ -90,21 +90,6 @@ export default function AddTaskModal() {
           </select>
         </div>
 
-        <div>
-          <label className="block text-xs font-medium text-sage-400 mb-1.5">Certificate Reward (optional)</label>
-          <select
-            name="rewardCertLevel"
-            defaultValue=""
-            className="w-full px-3 py-2 rounded-lg border border-sage-200 text-sm text-ink focus:border-forest-700 outline-none transition-colors"
-          >
-            <option value="">No certificate</option>
-            <option value="bronze">Bronze</option>
-            <option value="silver">Silver</option>
-            <option value="gold">Gold</option>
-            <option value="platinum">Platinum</option>
-          </select>
-        </div>
-
         <button
           type="submit"
           disabled={pending}

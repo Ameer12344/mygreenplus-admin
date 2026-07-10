@@ -6,6 +6,7 @@ import SearchBox from '@/components/SearchBox';
 import UpdateRvmStatus from './UpdateRvmStatus';
 import LogDropoffModal from './LogDropoffModal';
 import ExportCsvButton from './ExportCsvButton';
+import RealtimeRefresher from '@/components/RealtimeRefresher';
 import { MapPin, Package } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -116,6 +117,8 @@ export default async function DropoffsPage({
 
   return (
     <div className="space-y-8">
+      <RealtimeRefresher table="rvm_machines" />
+      <RealtimeRefresher table="drop_off_history" />
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
           <h1 className="font-display font-semibold text-2xl text-ink">Drop-offs &amp; RVMs</h1>

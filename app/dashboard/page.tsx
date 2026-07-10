@@ -75,7 +75,7 @@ export default async function OverviewPage() {
   const totalKg = (usersAgg ?? []).reduce((sum, u) => sum + (Number(u.total_kg) || 0), 0);
   const totalPoints = (usersAgg ?? []).reduce((sum, u) => sum + (Number(u.eco_points) || 0), 0);
 
-  const rvmCounts = { online: 0, near_full: 0, offline: 0 };
+  const rvmCounts = { online: 0, near_full: 0, offline: 0, maintenance: 0 };
   (rvms ?? []).forEach((m) => {
     if (m.status in rvmCounts) {
       rvmCounts[m.status as keyof typeof rvmCounts]++;
@@ -110,6 +110,7 @@ export default async function OverviewPage() {
       <RealtimeRefresher table="drop_off_history" />
       <RealtimeRefresher table="problem_reports" />
       <RealtimeRefresher table="withdrawals" />
+      <RealtimeRefresher table="rvm_machines" />
 
       <div>
         <h1 className="font-display font-semibold text-2xl text-ink">Overview</h1>
@@ -157,6 +158,7 @@ export default async function OverviewPage() {
             <RvmRow label="Online" count={rvmCounts.online} dot="bg-forest-700" />
             <RvmRow label="Near full" count={rvmCounts.near_full} dot="bg-amber-600" />
             <RvmRow label="Offline" count={rvmCounts.offline} dot="bg-rose-600" />
+            <RvmRow label="Maintenance" count={rvmCounts.maintenance} dot="bg-sky-600" />
           </div>
           <Link
             href="/dashboard/dropoffs"

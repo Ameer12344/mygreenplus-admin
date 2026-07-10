@@ -16,7 +16,7 @@ export async function logDropoff(formData: FormData) {
   const weightKg = parseFloat(formData.get('weightKg') as string);
   const rvmId = (formData.get('rvmId') as string)?.trim() || null;
 
-  if (!userId || !materialType || isNaN(weightKg) || weightKg <= 0) return;
+  if (!userId || !materialType || isNaN(weightKg) || weightKg <= 0 || weightKg > 200) return;
 
   const pointsEarned = calculatePoints(materialType, weightKg);
   const supabase = createServiceClient();
@@ -67,14 +67,25 @@ if (insertError) {
 export async function updateRvmStatus(formData: FormData) {
   const rvmId = formData.get('rvmId') as string;
   const status = formData.get('status') as string;
-  const capacityPct = parseInt(formData.get('capacityPct') as string);
 
   if (!rvmId || !status) return;
 
   const supabase = createServiceClient();
+
+  // Only touch `status` (+ the override flag) — capacity_pct is always
+  // derived automatically from current_kg via the database trigger, so it
+  // must never be manually overwritten here.
+  //
+  // is_manual_override = true tells that trigger to leave `status` alone
+  // going forward, so an admin-picked status (most importantly
+  // 'maintenance') doesn't get silently reverted back to
+  // online/near_full/offline the next time a drop-off changes this
+  // machine's capacity_pct. It's cleared again by "Mark as emptied" (see
+  // resetCapacityAction.ts), which hands control back to the automatic
+  // capacity-based logic.
   await supabase.from('rvm_machines').update({
     status,
-    capacity_pct: isNaN(capacityPct) ? undefined : capacityPct,
+    is_manual_override: true,
     last_active: new Date().toISOString(),
   }).eq('id', rvmId);
 

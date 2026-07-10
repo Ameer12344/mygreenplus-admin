@@ -9,7 +9,6 @@ export async function createTask(formData: FormData) {
   const goalType = formData.get('goalType') as string;
   const goalValue = parseFloat(formData.get('goalValue') as string);
   const materialType = (formData.get('materialType') as string)?.trim() || null;
-  const rewardCertLevel = (formData.get('rewardCertLevel') as string)?.trim() || null;
 
   if (!title || !goalType || isNaN(goalValue)) return;
 
@@ -20,7 +19,6 @@ export async function createTask(formData: FormData) {
     goal_type: goalType,
     goal_value: goalValue,
     material_type: materialType || null,
-    reward_cert_level: rewardCertLevel || null,
     status: 'active',
   });
 

@@ -100,6 +100,7 @@ export default async function CertificatesPage({
     <div className="space-y-6">
       <RealtimeRefresher table="drop_off_history" />
       <RealtimeRefresher table="certificates" />
+      <RealtimeRefresher table="tasks" />
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
           <h1 className="font-display font-semibold text-2xl text-ink">Certificates &amp; Tasks</h1>

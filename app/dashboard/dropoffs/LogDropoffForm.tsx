@@ -76,12 +76,14 @@ export default function LogDropoffForm({
           type="number"
           step="0.01"
           min="0.01"
+          max="200"
           required
           value={weightKg}
           onChange={(e) => setWeightKg(e.target.value)}
           placeholder="e.g. 2.5"
           className="w-full px-3 py-2 rounded-lg border border-sage-200 text-sm text-ink placeholder:text-sage-400/70 focus:border-forest-700 outline-none transition-colors"
         />
+        <p className="text-xs text-sage-400/70 mt-1">Max 200 kg per drop-off session.</p>
       </div>
 
       <div>

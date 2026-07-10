@@ -25,7 +25,7 @@ export async function logDropoff(formData: FormData) {
   user_id: userId,
   rvm_id: rvmId,
   material_type: materialType,
-  weight_kg: weightKg,
+  weight_kg: weightKg, 
   points_earned: pointsEarned,
 });
 
