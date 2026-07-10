@@ -7,6 +7,7 @@ import UpdateRvmStatus from './UpdateRvmStatus';
 import LogDropoffModal from './LogDropoffModal';
 import ExportCsvButton from './ExportCsvButton';
 import RealtimeRefresher from '@/components/RealtimeRefresher';
+import DropoffFilters from './DropoffFilters';
 import { MapPin, Package } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -16,14 +17,28 @@ const PAGE_SIZE = 25;
 export default async function DropoffsPage({
   searchParams,
 }: {
-  searchParams: { q?: string; page?: string };
+  searchParams: {
+    q?: string;
+    page?: string;
+    from?: string;
+    to?: string;
+    rvm?: string;
+    material?: string;
+    user?: string;
+  };
 }) {
   const supabase = createClient();
   const serviceSupabase = createServiceClient();
   const q = searchParams.q?.trim() ?? '';
+  const dateFrom = searchParams.from?.trim() ?? '';
+  const dateTo = searchParams.to?.trim() ?? '';
+  const rvmFilter = searchParams.rvm?.trim() ?? '';
+  const materialFilter = searchParams.material?.trim() ?? '';
+  const userFilter = searchParams.user?.trim() ?? '';
   const page = Math.max(1, Number(searchParams.page) || 1);
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
+  const hasFilters = Boolean(q || dateFrom || dateTo || rvmFilter || materialFilter || userFilter);
 
   const rvmsPromise = serviceSupabase
     .from('rvm_machines')
@@ -46,7 +61,14 @@ export default async function DropoffsPage({
   let dropoffs: any[] = [];
   let count = 0;
 
-  if (q) {
+  // Free-text search resolves to matching user/machine IDs, but only when
+  // the station/user dropdown filters aren't already narrowing things down.
+  const useTextSearch = Boolean(q) && !userFilter && !rvmFilter;
+  let searchUserIds: string[] = [];
+  let searchRvmIds: string[] = [];
+  let searchHasNoMatches = false;
+
+  if (useTextSearch) {
     const [{ data: matchedUsers }, { data: matchedRvms }] = await Promise.all([
       supabase.from('app_users').select('id').ilike('name', `%${q}%`),
       supabase
@@ -54,46 +76,41 @@ export default async function DropoffsPage({
         .select('id')
         .or(`machine_code.ilike.%${q}%,location_name.ilike.%${q}%`),
     ]);
-
-    const userIds = (matchedUsers ?? []).map((u) => u.id);
-    const rvmIds = (matchedRvms ?? []).map((m) => m.id);
-
-    if (userIds.length === 0 && rvmIds.length === 0) {
-      dropoffs = [];
-      count = 0;
-    } else {
-      const orParts: string[] = [];
-      if (userIds.length) orParts.push(`user_id.in.(${userIds.join(',')})`);
-      if (rvmIds.length) orParts.push(`rvm_id.in.(${rvmIds.join(',')})`);
-
-      const { data, count: matchCount } = await supabase
-        .from('drop_off_history')
-        .select(dropoffColumns, { count: 'exact' })
-        .or(orParts.join(','))
-        .order('created_at', { ascending: false })
-        .limit(200);
-
-      dropoffs = data ?? [];
-      count = matchCount ?? dropoffs.length;
-    }
+    searchUserIds = (matchedUsers ?? []).map((u) => u.id);
+    searchRvmIds = (matchedRvms ?? []).map((m) => m.id);
+    searchHasNoMatches = searchUserIds.length === 0 && searchRvmIds.length === 0;
   }
 
-  const dropoffsQuery = q
-    ? null
-    : supabase
-        .from('drop_off_history')
-        .select(dropoffColumns, { count: 'exact' })
-        .order('created_at', { ascending: false })
-        .range(from, to);
+  let dropoffsQuery = supabase
+    .from('drop_off_history')
+    .select(dropoffColumns, { count: 'exact' });
+
+  if (materialFilter) dropoffsQuery = dropoffsQuery.eq('material_type', materialFilter);
+  if (dateFrom) dropoffsQuery = dropoffsQuery.gte('created_at', `${dateFrom}T00:00:00`);
+  if (dateTo) dropoffsQuery = dropoffsQuery.lte('created_at', `${dateTo}T23:59:59`);
+  if (rvmFilter) dropoffsQuery = dropoffsQuery.eq('rvm_id', rvmFilter);
+  if (userFilter) dropoffsQuery = dropoffsQuery.eq('user_id', userFilter);
+
+  if (useTextSearch && !searchHasNoMatches) {
+    const orParts: string[] = [];
+    if (searchUserIds.length) orParts.push(`user_id.in.(${searchUserIds.join(',')})`);
+    if (searchRvmIds.length) orParts.push(`rvm_id.in.(${searchRvmIds.join(',')})`);
+    dropoffsQuery = dropoffsQuery.or(orParts.join(','));
+  }
+
+  // Skip the round-trip entirely when a text search matched nothing.
+  const shouldFetchDropoffs = !(useTextSearch && searchHasNoMatches);
 
   const [{ data: rvms }, dropoffsResult, { data: allDropoffs }, { data: dropoffUsers }] = await Promise.all([
     rvmsPromise,
-    dropoffsQuery ?? Promise.resolve({ data: null, count: null }),
+    shouldFetchDropoffs
+      ? dropoffsQuery.order('created_at', { ascending: false }).range(from, to)
+      : Promise.resolve({ data: null, count: null }),
     kgPerMachinePromise,
     usersPromise,
   ]);
 
-  if (!q && dropoffsResult) {
+  if (shouldFetchDropoffs) {
     dropoffs = dropoffsResult.data ?? [];
     count = dropoffsResult.count ?? 0;
   }
@@ -107,6 +124,18 @@ export default async function DropoffsPage({
   });
 
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
+
+  const buildPageHref = (targetPage: number) => {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (dateFrom) params.set('from', dateFrom);
+    if (dateTo) params.set('to', dateTo);
+    if (rvmFilter) params.set('rvm', rvmFilter);
+    if (materialFilter) params.set('material', materialFilter);
+    if (userFilter) params.set('user', userFilter);
+    params.set('page', String(targetPage));
+    return `/dashboard/dropoffs?${params.toString()}`;
+  };
 
   const capacityColor = (pct: number) => {
     if (pct >= 90) return { bar: '#EF4444', bg: '#FEF2F2', text: '#DC2626' };
@@ -220,6 +249,10 @@ export default async function DropoffsPage({
           </div>
         </div>
 
+        <div className="mb-3">
+          <DropoffFilters rvms={rvms ?? []} users={dropoffUsers ?? []} />
+        </div>
+
         <div className="bg-white rounded-xl2 shadow-card overflow-hidden">
           <div className="overflow-x-auto scrollbar-thin">
             <table className="w-full text-sm">
@@ -258,7 +291,7 @@ export default async function DropoffsPage({
                 {dropoffs.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-5 py-10 text-center text-sage-400">
-                      {q ? `No drop-offs match "${q}".` : 'No drop-offs recorded yet.'}
+                      {hasFilters ? 'No drop-offs match these filters.' : 'No drop-offs recorded yet.'}
                     </td>
                   </tr>
                 )}
@@ -266,19 +299,19 @@ export default async function DropoffsPage({
             </table>
           </div>
 
-          {totalPages > 1 && !q && (
+          {totalPages > 1 && (
             <div className="flex items-center justify-between px-5 py-3 border-t border-sage-100 text-sm">
               <span className="text-sage-400">
                 Page {page} of {totalPages}
               </span>
               <div className="flex gap-2">
                 {page > 1 && (
-                  <a href={`/dashboard/dropoffs?page=${page - 1}`} className="px-3 py-1.5 rounded-lg text-ink hover:bg-sage-100 transition-colors">
+                  <a href={buildPageHref(page - 1)} className="px-3 py-1.5 rounded-lg text-ink hover:bg-sage-100 transition-colors">
                     Previous
                   </a>
                 )}
                 {page < totalPages && (
-                  <a href={`/dashboard/dropoffs?page=${page + 1}`} className="px-3 py-1.5 rounded-lg text-ink hover:bg-sage-100 transition-colors">
+                  <a href={buildPageHref(page + 1)} className="px-3 py-1.5 rounded-lg text-ink hover:bg-sage-100 transition-colors">
                     Next
                   </a>
                 )}
